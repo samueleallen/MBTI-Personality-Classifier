@@ -43,11 +43,13 @@ def get_word_count(text_col):
 
         # Loop through inner list (each tweet)
         for tweet_text in list_of_tweets:
-            # 1. Strip any extra whitespace
-            tweet_text.strip()
+            # Strip any extra whitespace
+            cleaned_text = tweet_text.strip()
 
-            # Add to word count
-            word_count += len(tweet_text)
+            if cleaned_text:
+                # Add to word count
+                words = cleaned_text.split()
+                word_count += len(words)
 
         word_count_col.append(word_count)
     
