@@ -456,4 +456,10 @@ class MyPyTable:
         return MyPyTable(joined_cols, outer_join_data)
 
 
+    def drop_column(self, column_identifier):
+        col_index = self.column_names.index(column_identifier)
+        for i in range(len(self.data)):
+            del self.data[i][col_index]
+        del self.column_names[col_index]
+    
 
