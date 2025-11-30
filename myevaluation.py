@@ -4,6 +4,7 @@
 ##############################################
 import numpy as np # use numpy's random number generation
 import math
+import random
 
 def train_test_split(X, y, test_size=0.33, random_state=None, shuffle=True):
     """Split dataset into train and test sets based on a test set size.
@@ -393,3 +394,50 @@ def binary_f1_score(y_true, y_pred, labels=None, pos_label=None):
     f1 = 2 * (precision * recall) / (precision + recall)
 
     return f1
+
+
+def stratified_split(X, y, test_size=0.2):
+    # group indices by label
+    label_to_indices = {}
+    i = 0
+    while i < len(y):
+        label = y[i]
+        if label not in label_to_indices:
+            label_to_indices[label] = []
+        label_to_indices[label].append(i)
+        i += 1
+
+    # shuffle each group
+    for label in label_to_indices:
+        random.shuffle(label_to_indices[label])
+
+    # compute split per group
+    train_indices = []
+    test_indices = []
+
+    for label in label_to_indices:
+        group = label_to_indices[label]
+        n = len(group)
+        k = int(n * test_size)
+
+        test_indices.extend(group[:k])
+        train_indices.extend(group[k:])
+
+    # build final splits
+    X_train, y_train, X_test, y_test = [], [], [], []
+
+    i = 0
+    while i < len(train_indices):
+        idx = train_indices[i]
+        X_train.append(X[idx])
+        y_train.append(y[idx])
+        i += 1
+
+    j = 0
+    while j < len(test_indices):
+        idx = test_indices[j]
+        X_test.append(X[idx])
+        y_test.append(y[idx])
+        j += 1
+
+    return X_train, X_test, y_train, y_test
