@@ -2,8 +2,11 @@
 # Description: Program contains various
 # classifiers
 ##############################################
-from mysklearn import myutils
+import myutils
 import math
+import graphviz
+import myevaluation
+import random
 
 class MyKNeighborsClassifier:
     """Represents a simple k nearest neighbors classifier.
@@ -297,3 +300,258 @@ class MyNaiveBayesClassifier:
             y_predicted.append(best_label)
 
         return y_predicted
+    
+class MyDecisionTreeClassifier:
+    """Represents a decision tree classifier.
+
+    Attributes:
+        X_train(list of list of obj): The list of training instances (samples).
+                The shape of X_train is (n_train_samples, n_features)
+        y_train(list of obj): The target y values (parallel to X_train).
+            The shape of y_train is n_samples
+        tree(nested list): The extracted tree model.
+
+    Notes:
+        Loosely based on sklearn's DecisionTreeClassifier:
+            https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html
+        Terminology: instance = sample = row and attribute = feature = column
+    """
+    def __init__(self):
+        """Initializer for MyDecisionTreeClassifier.
+        """
+        self.X_train = None
+        self.y_train = None
+        self.tree = None
+        self.node_counter = 0
+
+    def fit(self, X_train, y_train):
+        """Fits a decision tree classifier to X_train and y_train using the TDIDT
+        (top down induction of decision tree) algorithm.
+
+        Args:
+            X_train(list of list of obj): The list of training instances (samples).
+                The shape of X_train is (n_train_samples, n_features)
+            y_train(list of obj): The target y values (parallel to X_train)
+                The shape of y_train is n_train_samples
+
+        Notes:
+            Since TDIDT is an eager learning algorithm, this method builds a decision tree model
+                from the training data.
+            Build a decision tree using the nested list representation described in class.
+            On a majority vote tie, choose first attribute value based on attribute domain ordering.
+            Store the tree in the tree attribute.
+            Use attribute indexes to construct default attribute names (e.g. "att0", "att1", ...).
+        """
+        # Set class member variables
+        self.X_train = X_train
+        self.y_train = y_train
+
+        # Set header and attr domains
+        global header, attribute_domains
+        header = myutils.get_attribute_header(X_train)
+        attribute_domains = myutils.get_attribute_domains(X_train, header)
+
+        myutils.set_utils_globals(header, attribute_domains)
+
+        # Merge X_train and y_train
+        train_instances = [X_train[i] + [y_train[i]] for i in range(len(X_train))]
+
+        # Make copy of header for available attributes
+        available_attributes = header.copy()
+
+        # Start TDIDT
+        self.tree = myutils.tdidt(train_instances, available_attributes)
+
+    def predict(self, X_test):
+        """Makes predictions for test instances in X_test.
+
+        Args:
+            X_test(list of list of obj): The list of testing samples
+                The shape of X_test is (n_test_samples, n_features)
+
+        Returns:
+            y_predicted(list of obj): The predicted target y values (parallel to X_test)
+        """
+        y_predicted = [myutils.tdidt_predict(self.tree, instance) for instance in X_test]
+
+        return y_predicted
+
+    def print_decision_rules(self, attribute_names=None, class_name="class"):
+        """Prints the decision rules from the tree in the format
+        "IF att == val AND ... THEN class = label", one rule on each line.
+
+        Args:
+            attribute_names(list of str or None): A list of attribute names to use in the decision rules
+                (None if a list is not provided and the default attribute names based on indexes
+                (e.g. "att0", "att1", ...) should be used).
+            class_name(str): A string to use for the class name in the decision rules
+                ("class" if a string is not provided and the default name "class" should be used).
+        """
+        rules = []
+
+        myutils.get_rules(self.tree, attribute_names, class_name, "", rules)
+
+        for rule in rules:
+            print(rule)
+
+    # BONUS method
+    def visualize_tree(self, dot_fname, pdf_fname, attribute_names=None):
+        """BONUS: Visualizes a tree via the open source Graphviz graph visualization package and
+        its DOT graph language (produces .dot and .pdf files).
+
+        Args:
+            dot_fname(str): The name of the .dot output file.
+            pdf_fname(str): The name of the .pdf output file generated from the .dot file.
+            attribute_names(list of str or None): A list of attribute names to use in the decision rules
+                (None if a list is not provided and the default attribute names based on indexes
+                (e.g. "att0", "att1", ...) should be used).
+
+        Notes:
+            Graphviz: https://graphviz.org/
+            DOT language: https://graphviz.org/doc/info/lang.html
+            You will need to install graphviz in the Docker container as shown in class to complete this method.
+        """
+        dot = graphviz.Digraph(name="Decision Tree")
+
+        # Recursive helper function to build graph
+        def build_graph(tree, parent_id = None, edge_label = ""):
+            # Assign ID for curr node
+            curr_id = str(self.node_counter)
+            self.node_counter += 1
+
+            node_type = tree[0]
+
+            if node_type == "Leaf":
+                label = tree[1]
+                node_label = f"Class: {label}"
+
+                # Create leaf node
+                dot.node(curr_id, label)
+            
+            elif node_type == "Attribute":
+                # Set attr_name for graph display
+                attr = tree[1]
+
+                try:
+                    # Check if the attribute has specific header name
+                    attr_index = header.index(attr)
+                except:
+                    # If tree[1] is already an index
+                    attr_index = attr
+
+                # See if there is corresponding attribute name
+                if attribute_names is not None and isinstance(attr_index, int) and attr_index < len(attribute_domains):
+                    attr_name = attribute_names[attr_index]
+                else:
+                    # Default to name stored in tree
+                    attr_name = attr
+                
+                node_label = attr_name
+
+                # Create attribute node
+                dot.node(curr_id, node_label)
+
+                # Now recursively iterate through children
+                for i in range(2, len(tree)):
+                    value_node = tree[i]
+                    attr_value = value_node[1]
+                    subtree = value_node[2]
+
+                    # Our value becomes edge label
+                    new_edge_label = str(attr_value)
+
+                    # Recursively call function
+                    build_graph(subtree, curr_id, new_edge_label)
+            
+            # Connect curr node to parent (if not the root node)
+            if parent_id is not None:
+                dot.edge(parent_id, curr_id, edge_label)
+
+            return curr_id
+        
+        # Now use helper function to generate tree from root
+        build_graph(self.tree)
+
+        # Save graph
+        dot.render(dot_fname, format="dot", cleanup=True)
+        dot.render(dot_fname, format="pdf", cleanup=True)
+
+class MyRandomForestClassifier:
+    """
+    Represents a decision tree classifier.
+
+    Attributes:
+        n_estimators (int): Number of trees in the forest
+        n_features (float/int): Number of features to consider when looking for best split. If float, it is the percentage, if int it is the number.
+        forest (list): List of trained MyDecisionTreeClassifier objects.
+    """
+    def __init__(self, n_estimators=50, n_features = 0.5):
+        self.n_estimators = n_estimators
+        self.n_features = n_features
+        self.forest = []
+        self.feature_map = [] # For storing subset of features used in each tree
+    
+    def fit(self, X_train, y_train):
+        """
+        Fits a random forest classifier to X_train and y_train.
+
+        Args:
+            X_train(list of list of obj): The list of training instances (samples).
+                The shape of X_train is (n_train_samples, n_features)
+            y_train(list of obj): The target y values (parallel to X_train)
+                The shape of y_train is n_train_samples
+        """
+        self.forest = []
+        self.feature_map = []
+
+        n_total_features = len(X_train[0])
+
+        # Detrmine num of features to sample
+        if isinstance(self.n_features, float):
+            k = int(self.n_features * n_total_features)
+        else:
+            k = int(self.n_features)
+
+        for i in range(self.n_estimators):
+            # Create bootstrap sets
+            X_b, X_oob, y_b, y_oob = myutils.bootstrap_sample(X_train, y_train)
+
+            all_feature_indices = list(range(n_total_features))
+            sampled_feature_indices = random.sample(all_feature_indices, k=k)
+
+            self.feature_map.append(sampled_feature_indices)
+
+            # Create training set with sampled features
+            X_b_sampled = myutils.get_feature_subset(X_b, sampled_feature_indices)
+
+            # Train new decision tree
+            tree_model = MyDecisionTreeClassifier()
+            tree_model.fit(X_b_sampled, y_b)
+            self.forest.append(tree_model)
+
+    def predict(self, X_test):
+        """
+        Makes predictions for test instance via majority voting
+        """
+        all_preds = []
+
+        counter = 0
+        for tree_model in self.forest:
+            # Get feature indices that the tree was trained on
+            sampled_feature_indices = self.feature_map[counter]
+
+            # Get corresponding features from test set
+            X_test_sampled = myutils.get_feature_subset(X_test, sampled_feature_indices)
+
+            # Get and store preds from tree
+            tree_preds = tree_model.predict(X_test_sampled)
+            all_preds.append(tree_preds)
+
+            counter += 1
+
+        preds_per_instance = list(zip(*all_preds))
+
+        # Calculate final prediction via majority vote
+        y_pred = [myutils.rf_majority_vote(preds) for preds in preds_per_instance]
+
+        return y_pred

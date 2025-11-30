@@ -7,10 +7,13 @@
 # functions for data analytics, exploration,
 # cleaning, and train/test splitting.
 ##############################################
-
+import math
 import numpy as np
-from .mypytable import MyPyTable
-from .myevaluation import accuracy_score, train_test_split, kfold_split, bootstrap_sample
+from mypytable import MyPyTable
+from myevaluation import accuracy_score, train_test_split, kfold_split, bootstrap_sample
+
+GLOBAL_HEADER = None # Used for decision tree
+GLOBAL_ATTRIBUTE_DOMAINS = None
 
 def random_instances(table, num_instances):
     """
@@ -320,3 +323,337 @@ def clean_cf_matrix(cf_data, labels):
         data.append(new_row)
 
     return data
+
+def get_feature_subset(X, feature_indices):
+    """
+    Returns new dataset containing only features specified by feature_indices
+    
+    Arguments:
+        X (list of list of obj): The list of samples
+        feature_indices (list of int): The indices of the columns to include in the new subset
+        
+    Outputs:
+        X_subset (list of list of obj): The list of samples with only the selected features
+    """
+    X_subset = []
+
+    # Iterate through each instance
+    for row in X:
+        new_row = []
+        # Iterate through indices to keep
+        for feature_index in feature_indices:
+            # Append value from col
+            new_row.append(row[feature_index])
+
+        X_subset.append(new_row)
+    
+    return X_subset
+
+def set_utils_globals(header, attribute_domains):
+    """
+    Sets global variables required for util functions
+    """
+    global GLOBAL_HEADER
+    global GLOBAL_ATTRIBUTE_DOMAINS
+
+    GLOBAL_HEADER = header
+    GLOBAL_ATTRIBUTE_DOMAINS = attribute_domains
+
+def get_attribute_header(X):
+    return [f"att{i}" for i in range(len(X[0]))]
+
+def get_attribute_domains(X, header):
+    domains = {}
+
+    for i, attr in enumerate(header):
+        domains[attr] = sorted(list(set(row[i] for row in X)))
+
+    return domains
+
+def majority_vote(instances):
+    # Get class labels
+    labels = [instance[-1] for instance in instances]
+
+    # Get frequency of each label
+    counts = {}
+    for label in labels:
+        if label in counts:
+            counts[label] += 1
+        else:
+            counts[label] = 1
+    
+    # Determine max count of labels
+    max_count = max(counts.values())
+
+    # Find majority label(s)
+    majority_labels = [label for label, count in counts.items() if count == max_count]
+
+    # On tie, just choose value based on ascending alphabetical order
+    majority_labels.sort()
+
+    return majority_labels[0]
+
+def rf_majority_vote(predictions):
+    """
+    Finds the majority vote from a list of class predictions.
+
+    Arguments:
+        predictions(list of obj): A list of class labels predicted by individual trees.
+
+    Outputs:
+        obj: The majority class label.
+    """
+    # Get frequency of each label
+    counts = {}
+    for label in predictions:
+        if label in counts:
+            counts[label] += 1
+        else:
+            counts[label] = 1
+    
+    # Determine max count of labels
+    max_count = max(counts.values())
+
+    # Find majority label(s)
+    majority_labels = [label for label, count in counts.items() if count == max_count]
+
+    # On tie, just choose value based on ascending alphabetical order
+    majority_labels.sort()
+
+    return majority_labels[0]
+
+def compute_entropy(instances):
+    """
+    Calculates entropy for set of instances
+    """
+    if not instances:
+        return 0.0
+    
+    # Get class labels
+    labels = [instance[-1] for instance in instances]
+
+    # Get frequency of each label
+    counts = {}
+    for label in labels:
+        if label in counts:
+            counts[label] += 1
+        else:
+            counts[label] = 1
+    
+    total = len(instances)
+
+    entropy = 0.0
+
+    for count in counts.values():
+        p = count / total
+        if p > 0:
+            entropy -= p * math.log(p, 2)
+        
+    return entropy
+
+def compute_enew(instances, attribute):
+    """
+    Computes weighted average entrpy for splitting on a specified attribute
+    """
+    partitions = partition_instances(instances, attribute)
+    total_instances = len(instances)
+    enew = 0.0
+
+    for partition in partitions.values():
+        if len(partition) > 0:
+            weight = len(partition) / total_instances
+            enew += weight * compute_entropy(partition)
+    
+    return enew
+
+def select_attribute(instances, attributes):
+    # TODO: implement the general Enew algorithm for attribute selection
+    # for each available attribute
+    #     for each value in the attribute's domain
+    #          calculate the entropy for the value's partition
+    #     calculate the weighted average for the parition entropies
+    # select that attribute with the smallest Enew entropy
+    # for now, select an attribute randomly
+    if not instances:
+        return None
+    
+    best_attr = None
+    min_enew = float('inf')
+
+    for attribute in attributes:
+        curr_enew = compute_enew(instances, attribute)
+        if curr_enew is None:
+            continue
+        if curr_enew < min_enew:
+            min_enew = curr_enew
+            best_attr = attribute
+        
+    return best_attr
+
+def partition_instances(instances, attribute):
+    # this is group by attribute domain (not values of attribute in instances)
+    # Returns a dictionary: {attribute_value: [instances]}
+    att_index = GLOBAL_HEADER.index(attribute)
+    att_domain = GLOBAL_ATTRIBUTE_DOMAINS[attribute]
+
+    partitions = {}
+    for att_value in att_domain: # "Junior" -> "Mid" -> "Senior"
+        partitions[att_value] = []
+        for instance in instances:
+            if instance[att_index] == att_value:
+                partitions[att_value].append(instance)
+
+    return partitions
+
+def all_same_class(instances):
+    if not instances:
+        return False
+    # get the class label of the first instance.
+    first_class = instances[0][-1]
+    for instance in instances:
+        # if any label differs, return False immediately.
+        if instance[-1] != first_class:
+            return False
+        
+    # if the loop completes without finding differences, return True.
+    return True 
+
+def tdidt(current_instances, available_attributes, parent_total=None):
+    
+    #    Recursively building a decision tree using the TDIDT algorithm.
+
+    #     1. Select the best attribute to split on and create an "Attribute" node.
+    #     2. For each value of the selected attribute:
+    #         a. Create a "Value" subtree.
+    #         b. If all instances in this partition have the same class:
+    #             - Append a "Leaf" node
+    #         c. If there are no more attributes to select:
+    #             - Append a "Leaf" node (handle clash w/majority vote leaf node)
+    #         d. If the partition is empty:
+    #             - Append a "Leaf" node (backtrack and replace attribute node with majority vote leaf node)
+    #         e. Otherwise:
+    #             - Recursively build another "Attribute" subtree for this partition
+    #               and append it to the "Value" subtree.
+    #     3. Append each "Value" subtree to the current "Attribute" node.
+    #     4. Return the current tree (nested list structure).
+    if parent_total is None:
+        parent_total = len(current_instances)
+
+    # Base case 1: Check if all isntances are of same class
+    if len(current_instances) > 0 and all_same_class(current_instances):
+        label = current_instances[0][-1]
+        return ["Leaf", label, len(current_instances), len(current_instances)]
+    
+    # Base case 2: Check if there are no more attributes to split on
+    if len(available_attributes) == 0:
+        label = majority_vote(current_instances)
+        return ["Leaf", label, len(current_instances), len(current_instances)]
+    
+    # Else, we recursively iterate
+    split_attribute = select_attribute(current_instances, available_attributes)
+
+    if split_attribute is None:
+        # IF no attribute to split on, use majority leaf
+        label = majority_vote(current_instances)
+        return ["Leaf", label, len(attr_partition), parent_total]
+    
+    new_attributes = available_attributes.copy()
+    new_attributes.remove(split_attribute)
+
+    tree = ["Attribute", split_attribute]
+
+    # GRoup data by attr domain
+    partitions = partition_instances(current_instances, split_attribute)
+
+    # Now for each partition we repeat until base case
+    for attr_value in sorted(partitions.keys()):
+        attr_partition = partitions[attr_value]
+        value_subtree = ["Value", attr_value]
+
+        # Base case 1: Check if there are no more instances to partition from
+        if len(attr_partition) == 0:
+            label = majority_vote(current_instances)
+            leaf = ["Leaf", label, 0, len(current_instances)]
+            value_subtree.append(leaf)
+
+        # Base case 2: Check if all instances of the partition have the same class label
+        elif all_same_class(attr_partition):
+            label = attr_partition[0][-1]
+            leaf = ["Leaf", label, len(attr_partition), len(current_instances)]
+            value_subtree.append(leaf)
+        
+        # Base case 3: Check if there are no more attributes to select
+        elif len(new_attributes) == 0:
+            label = majority_vote(attr_partition)
+            leaf = ["Leaf", label, len(attr_partition), len(current_instances)]
+            value_subtree.append(leaf)
+    
+        # Else, recursively iterate through to create a new subtree
+        else:
+            subtree = tdidt(attr_partition, new_attributes.copy(), len(attr_partition))
+            value_subtree.append(subtree)
+        
+        tree.append(value_subtree)
+    
+    return tree
+            
+
+
+def tdidt_predict(tree, instance):
+    data_type = tree[0]
+
+    # Base case: if this is a leaf, just return its class label
+    if data_type == "Leaf":
+        label = tree[1]
+        return label
+    
+    # Recursive case:if we are here, this is an Attribute node
+    attribute_name = tree[1]
+    attribute_index = GLOBAL_HEADER.index(attribute_name)
+    instance_value = instance[attribute_index]
+
+    # Look for the matching value node
+    for values in tree[2:]:
+        value = values[1]
+        subtree = values[2]
+        
+        if instance_value == value:
+            return tdidt_predict(subtree, instance)
+
+def get_rules(tree, attribute_names, class_name, curr_rule, rules):
+    """
+    Recursively goes through our tree to extract decision rules
+    """
+    node_type = tree[0]
+
+    # If leaf node, compelete rule
+    if node_type == "Leaf":
+        label = tree[1]
+        rule = f"{curr_rule} THEN {class_name} = {label}"
+        rules.append(rule)
+        return
+    
+    # Else, traverse nodes
+    if node_type == "Attribute":
+        attr_index = GLOBAL_HEADER.index(tree[1])
+
+        if attribute_names is not None and attr_index < len(attribute_names):
+            attr_name = attribute_names[attr_index]
+        else:
+            attr_name = tree[1]
+        
+        for i in range(2, len(tree)):
+            value_node = tree[i]
+            attr_value = value_node[1]
+            subtree = value_node[2]
+
+            # Build condition for rule
+            new_cond = f"{attr_name} == {attr_value}"
+
+            if curr_rule:
+                new_rule = f"{curr_rule} AND {new_cond}"
+            else:
+                new_rule = f"IF {new_cond}"
+
+            # Recursively iterate
+            get_rules(subtree, attribute_names, class_name, new_rule, rules)
