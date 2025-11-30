@@ -396,7 +396,7 @@ def binary_f1_score(y_true, y_pred, labels=None, pos_label=None):
     return f1
 
 
-def stratified_split(X, y, test_size=0.2):
+def stratified_split(X, y, test_size=0.33):
     # group indices by label
     label_to_indices = {}
     i = 0
