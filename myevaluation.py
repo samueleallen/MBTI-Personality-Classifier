@@ -423,6 +423,9 @@ def stratified_split(X, y, test_size=0.33):
         test_indices.extend(group[:k])
         train_indices.extend(group[k:])
 
+    random.shuffle(test_indices)
+    random.shuffle(train_indices)
+
     # build final splits
     X_train, y_train, X_test, y_test = [], [], [], []
 
