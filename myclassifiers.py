@@ -486,6 +486,13 @@ class MyRandomForestClassifier:
         forest (list): List of trained MyDecisionTreeClassifier objects.
     """
     def __init__(self, n_estimators=50, n_features = 0.5):
+        """
+        Initializer for RandomForest Classifier.
+        
+        Arguments:
+            n_estimators (int): Number of trees. Default is 50.
+            n_features (float/int): Number/percent of features. Default is 50%
+        """
         self.n_estimators = n_estimators
         self.n_features = n_features
         self.forest = []

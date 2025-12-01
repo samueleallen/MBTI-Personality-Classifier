@@ -481,19 +481,17 @@ class MyPyTable:
         new_table.column_names = self.column_names
         counter = 0
         i = 0
-        while counter < counts[non_frequent_label] + 1:
+        while counter < counts[non_frequent_label]:
             if column[i] == frequent_label:
                 new_table.data.append(self.data[i])
                 new_column.append(column[i])
                 counter += 1
+            i += 1
         for j in range(len(column)):
             if column[j] == non_frequent_label:
                 new_table.data.append(self.data[j])
                 new_column.append(column[j])
-                    
-                    
 
-        
         return new_table, new_column
 
         
