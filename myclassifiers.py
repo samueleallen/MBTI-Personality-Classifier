@@ -4,7 +4,7 @@
 ##############################################
 import myutils
 import math
-import graphviz
+# import graphviz
 import myevaluation
 import random
 
@@ -411,7 +411,7 @@ class MyDecisionTreeClassifier:
             DOT language: https://graphviz.org/doc/info/lang.html
             You will need to install graphviz in the Docker container as shown in class to complete this method.
         """
-        dot = graphviz.Digraph(name="Decision Tree")
+        # dot = graphviz.Digraph(name="Decision Tree")
 
         # Recursive helper function to build graph
         def build_graph(tree, parent_id = None, edge_label = ""):

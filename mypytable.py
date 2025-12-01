@@ -461,5 +461,42 @@ class MyPyTable:
         for i in range(len(self.data)):
             del self.data[i][col_index]
         del self.column_names[col_index]
-    
+
+    def even_class_distribution(self, column):
+        counts = {}
+
+        for element in column:
+            if element in counts:
+                counts[element] += 1
+            else:
+                counts[element] = 1
+
+        frequent_label = max(counts, key=counts.get)
+        non_frequent_label = min(counts, key=counts.get)
+        to_delete = counts[frequent_label] - counts[non_frequent_label]
+
+        new_column = []
+
+        new_table = MyPyTable()
+        new_table.column_names = self.column_names
+        counter = 0
+        i = 0
+        while counter < counts[non_frequent_label] + 1:
+            
+            if column[i] == frequent_label:
+                new_table.data.append(self.data[i])
+                new_column.append(column[i])
+                counter += 1
+            else:
+                new_table.data.append(self.data[i])
+                new_column.append(column[i])
+            i += 1
+                    
+                    
+
+        
+        return new_table, new_column
+
+        
+
 
