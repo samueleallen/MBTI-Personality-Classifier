@@ -619,6 +619,7 @@ def tdidt_predict(tree, instance):
         
         if instance_value == value:
             return tdidt_predict(subtree, instance)
+    return 'I'
 
 def get_rules(tree, attribute_names, class_name, curr_rule, rules):
     """
