@@ -16,4 +16,4 @@ The main content for viewing the project is in the `main.ipynb` file. All other 
 
 To run the test for our Random Forest Classifier run the following command inside the docker container:
 
-`pytest --verbose`
+`python test_forest.py`
