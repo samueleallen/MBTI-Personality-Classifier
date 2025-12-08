@@ -9,11 +9,65 @@
 ##############################################
 import math
 import numpy as np
+import copy
 from mypytable import MyPyTable
 from myevaluation import accuracy_score, train_test_split, kfold_split, bootstrap_sample
 
 GLOBAL_HEADER = None # Used for decision tree
 GLOBAL_ATTRIBUTE_DOMAINS = None
+
+def discretize(table, num_bins=5):
+    """
+    Discretizes a list of columns based on equal width binning.
+
+    Arguments:
+        table: MyPyTable object
+        bins (int): Number of equal-width bins
+    Outputs:
+        new_table: Cleaned MyPyTable where every numeric columns has equal width binning.
+    """
+    new_data = copy.deepcopy(table.data)
+    new_col_names = copy.deepcopy(table.column_names)
+
+    numeric_col_indices = []
+    bin_params = {}
+
+    # Fina all numeric cols and set bin parameters
+    for i, col_name in enumerate(new_col_names):
+        # Check if column is numeric
+        is_numeric = all(isinstance(val, (int, float)) for val in table.get_column(i))
+
+        if is_numeric:
+            numeric_col_indices.append(i)
+            col_data = [row[i] for row in table.data]
+
+            # Calculate min, max, and bin-width
+            min_val = min(col_data)
+            max_val = max(col_data)
+            bin_width = (max_val - min_val) / num_bins
+
+            bin_params[i] = {"min": min_val, "max": max_val, "width": bin_width}
+
+    # Now apply discretization for each numeric col
+    for row_index in range(len(new_data)):
+        for col_index in numeric_col_indices:
+            params = bin_params[col_index]
+            value = new_data[row_index][col_index]
+
+            min_val = params["min"]
+            bin_width = params["width"]
+
+            if value == params["max"]:
+                bin_index = num_bins - 1
+            else:
+                bin_index = math.floor((value - min_val) / bin_width)
+            
+            # Replace original val with bin index
+            new_data[row_index][col_index] = int(bin_index)
+        
+    new_table = MyPyTable(new_col_names, new_data)
+
+    return new_table
 
 def random_instances(table, num_instances):
     """
