@@ -16,6 +16,69 @@ from myevaluation import accuracy_score, train_test_split, kfold_split, bootstra
 GLOBAL_HEADER = None # Used for decision tree
 GLOBAL_ATTRIBUTE_DOMAINS = None
 
+def plot_avg_column(ax, labels, column, title, categories):
+    """
+    Function to plot average column of each differing class. Call this function 4 times, once for each separate binary class
+
+    Arguments:
+        ax: Instance of matplotlib.pyplot object
+        labels (list of str): List of each binary class occurence. For example, pass in our 'ie' list filled with 'I' or 'E' for introvert/extrovert per row in our dataset.
+        column (list of float): List of average column across all 50 tweets from each person.
+        title (str): Name of graph.
+        categories (list of str): The different binary outcomes for a class. For example, for our ie list we would pass in ["I", "E"].
+    """
+    counts = {} # stores number of each class (ie. number of introverts vs number of extroverts)
+    sums = {} # stores the sum of column fo each unique label (ie. total column for all introverts)
+
+    # Loop through each row
+    for i in range(len(labels)):
+        label = labels[i]
+        score = column[i]
+
+        # Count number of each label
+        if label in counts:
+            counts[label] += 1
+        else:
+            counts[label] = 1
+        
+        # Tally sum of column
+        if label in sums:
+            sums[label] += score
+        else:
+            sums[label] = score
+    
+    # Now calculate average column for each class based on sums and counts
+    average_polarities = []
+    for cat in categories:
+        avg = sums[cat] / counts[cat]
+        average_polarities.append(avg)
+
+    # Create bar chart
+    bars = ax.bar(categories, average_polarities, color=["crimson", "royalblue"], alpha=0.7)
+
+    ax.set_title(title)
+    ax.set_ylabel("Average column")
+    ax. axhline(0, color="black", linewidth=0.8)
+
+def create_bar(ax, data, title, labels):
+    # Count num of each label
+    counts = {}
+    
+    # Loop through each string value in the data
+    for instance in data:
+        if instance in counts:
+            counts[instance] += 1
+        else:
+            counts[instance] = 1
+
+    counts_values = [counts.get(label, 0) for label in labels]
+    
+    # Create bar chart
+    bars = ax.bar(labels, counts_values, color=["crimson", "royalblue"], alpha=0.7)
+
+    ax.set_title(title)
+    ax.set_ylabel("Count")
+
 def discretize(table, num_bins=5):
     """
     Discretizes a list of columns based on equal width binning.
