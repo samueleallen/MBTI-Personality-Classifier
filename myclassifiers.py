@@ -485,7 +485,7 @@ class MyRandomForestClassifier:
         n_features (float/int): Number of features to consider when looking for best split. If float, it is the percentage, if int it is the number.
         forest (list): List of trained MyDecisionTreeClassifier objects.
     """
-    def __init__(self, n_estimators=50, n_features = 0.5):
+    def __init__(self, n_estimators=50, m=10, n_features = 0.5):
         """
         Initializer for RandomForest Classifier.
         
@@ -494,6 +494,7 @@ class MyRandomForestClassifier:
             n_features (float/int): Number/percent of features. Default is 50%
         """
         self.n_estimators = n_estimators
+        self.m = m
         self.n_features = n_features
         self.forest = []
         self.feature_map = [] # For storing subset of features used in each tree
@@ -508,6 +509,7 @@ class MyRandomForestClassifier:
             y_train(list of obj): The target y values (parallel to X_train)
                 The shape of y_train is n_train_samples
         """
+        all_results = []
         self.forest = []
         self.feature_map = []
 
@@ -526,15 +528,28 @@ class MyRandomForestClassifier:
             all_feature_indices = list(range(n_total_features))
             sampled_feature_indices = random.sample(all_feature_indices, k=k)
 
-            self.feature_map.append(sampled_feature_indices)
-
             # Create training set with sampled features
             X_b_sampled = myutils.get_feature_subset(X_b, sampled_feature_indices)
 
             # Train new decision tree
             tree_model = MyDecisionTreeClassifier()
             tree_model.fit(X_b_sampled, y_b)
-            self.forest.append(tree_model)
+
+            X_oob_sampled = myutils.get_feature_subset(X_oob, sampled_feature_indices)
+            oob_preds = tree_model.predict(X_oob_sampled)
+
+            oob_acc = myutils.accuracy_score(y_oob, oob_preds)
+
+            all_results.append((oob_acc, tree_model, sampled_feature_indices))
+        
+        # Sort results by acc descending
+        all_results.sort(key=lambda x: x[0], reverse=True)
+
+        # Select top M results
+        top_m_results = all_results[:self.m]
+
+        self.forest = [item[1] for item in top_m_results]
+        self.feature_map = [item[2] for item in top_m_results]
 
     def predict(self, X_test):
         """
